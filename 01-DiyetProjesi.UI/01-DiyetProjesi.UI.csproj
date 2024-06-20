@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>_01_DiyetProjesi.UI</RootNamespace>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\01-DiyetProjesi.DAL\01-DiyetProjesi.DAL.csproj" />
+    <ProjectReference Include="..\01-DiyetProjesi.DATA\01-DiyetProjesi.DATA.csproj" />
+  </ItemGroup>
+
+</Project>
