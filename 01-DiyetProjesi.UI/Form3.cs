@@ -14,341 +14,174 @@ using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace _01_DiyetProjesi.UI
 {
-    public partial class Form3 : Form
+    public partial class Form3 : BaseForm
     {
+
+        private string _userEmail;
+        private DateTime _currentDate;
+        private readonly GenericRepository<GunUrunDetay> _gunUrunDetayRepository;
+        private readonly GenericRepository<Kullanici> _kullaniciRepository;
+        private readonly GenericRepository<Gun> _gunRepository;
+        private readonly GenericRepository<Urun> _urunRepository;
 
         public Form3()
         {
             InitializeComponent();
-
+            _gunUrunDetayRepository = new GenericRepository<GunUrunDetay>();
+            _kullaniciRepository = new GenericRepository<Kullanici>();
+            _gunRepository = new GenericRepository<Gun>();
+            _urunRepository = new GenericRepository<Urun>();
         }
-        string usermail = "";
-        DateTime dt = new DateTime();
+
         private void Form3_Load(object sender, EventArgs e)
         {
-            combOgunTipi.Items.Add("Kahvaltı");
-            combOgunTipi.Items.Add("Öğle");
-            combOgunTipi.Items.Add("Akşam");
-            combOgunTipi.Items.Add("Ara öğün");
+            InitializeControls();
+            LoadUserData();
+            UpdateUserInterface();
+        }
 
-            combKosulOperatoru.Items.Add("ile başlayan");
-            combKosulOperatoru.Items.Add("içeren");
-            combKosulOperatoru.Items.Add("ile biten");
-            UIMetotlari uim = new UIMetotlari();
+        private void InitializeControls()
+        {
+            InitializeComboBoxes();
+            _uiMetotlari.InitializeListView(lviewUrunler);
+            _uiMetotlari.InitializeListViewOgunlerim(lvOgunlerim);
+            _uiMetotlari.AddRememberance(this);
+        }
 
-            uim.AddRememberance(this);
-            uim.InitializeListView(lviewUrunler);
-            uim.InitializeListViewOgunlerim(lvOgunlerim);
+        private void InitializeComboBoxes()
+        {
+            combOgunTipi.Items.AddRange(new[] { "Kahvaltı", "Öğle", "Akşam", "Ara öğün" });
+            combKosulOperatoru.Items.AddRange(new[] { "ile başlayan", "içeren", "ile biten" });
+        }
 
+        private void LoadUserData()
+        {
+            LoadUserCredentials();
+            var currentUser = _kullaniciRepository.RepGetByConditionKullanici(_userEmail);
+            var currentDay = _gunRepository.RepGetByConditionGun(_currentDate);
 
+            AssociateUserWithDay(currentUser, currentDay);
+            LoadUserMeals(currentUser);
+        }
 
-
-            foreach (Control ctrl in this.Owner.Controls)
+        private void LoadUserCredentials()
+        {
+            foreach (Control ctrl in Owner.Controls)
             {
                 if (ctrl is GroupBox gb)
                 {
-                    foreach (Control ctr in gb.Controls)
-                    {
-                        if (ctr is System.Windows.Forms.TextBox tb && tb.Name == "tbEmail")
-                        {
-                            usermail = tb.Text;
-                        }
-
-                    }
+                    var emailBox = gb.Controls.OfType<System.Windows.Forms.TextBox>()
+                        .FirstOrDefault(tb => tb.Name == "tbEmail");
+                    if (emailBox != null)
+                        _userEmail = emailBox.Text;
                 }
                 else if (ctrl is Label lbl && lbl.Name == "lblTutucu")
                 {
-                    dt = Convert.ToDateTime(lbl.Text);
+                    _currentDate = Convert.ToDateTime(lbl.Text);
                 }
             }
-
-            GenericRepository<GunUrunDetay> gud = new GenericRepository<GunUrunDetay>();
-            List<GunUrunDetay> gudList = gud.RepGetbyConditionGunUrunDetay(dt);
-            GenericRepository<Kullanici> grKul = new GenericRepository<Kullanici>();
-            Kullanici kulin = grKul.RepGetByConditionKullanici(usermail);
-            List<GunUrunDetay> realGuds = new List<GunUrunDetay>();
-            foreach (GunUrunDetay gudi in gudList)
-            {
-                if (gudi.UserID == kulin.UserID)
-                {
-                    realGuds.Add(gudi);
-                }
-            }
-            if (gudList.Count > 0)
-                uim.PopulateListViewOgunlerim(realGuds, lvOgunlerim);
-
-            GenericRepository<Kullanici> grKullanici2 = new GenericRepository<Kullanici>();
-            List<Kullanici> mevcutKullanicilar = grKullanici2.RepGetAll();
-            GenericRepository<Kullanici> grKullanici = new GenericRepository<Kullanici>();
-            GenericRepository<Gun> grGun = new GenericRepository<Gun>();
-            Gun gun = grGun.RepGetByConditionGun(dt);
-            Kullanici kullanici = grKullanici.RepGetByConditionKullanici(usermail);
-            kullanici.Gunler.Add(gun);
-            int gunCounter = 0;
-            foreach (Kullanici kul in mevcutKullanicilar)
-            {
-                foreach (Gun altinGun in kul.Gunler)
-                {
-                    if (altinGun.ToString() == gun.ToString())
-                    {
-                        gunCounter++;
-                    }
-                }
-            }
-            if (gunCounter == 0)
-            {
-                grKullanici.RepUpdate(kullanici);
-            }
-            GenericRepository<Kullanici> genericRepository = new GenericRepository<Kullanici>();
-            Kullanici kuli = genericRepository.RepGetByConditionKullanici(usermail);
-
-            uim.HedefKaloriHesaplaVeAta(progressBar1, lblHedefKalori, kuli);
-            uim.AlinmisKaloriHesaplaVeGuncelle(lblAldigimKalori, dt, progressBar1, usermail);
-
         }
 
-        private void profilimiGörToolStripMenuItem_Click(object sender, EventArgs e)
+        private void LoadUserMeals(Kullanici user)
         {
-            Form4 form4 = new Form4();
-            form4.Owner = this;
-            form4.Show();
-            this.Hide();
+            var meals = _gunUrunDetayRepository.RepGetbyConditionGunUrunDetay(_currentDate)
+                .Where(m => m.UserID == user.UserID)
+                .ToList();
+
+            if (meals.Any())
+            {
+                _uiMetotlari.PopulateListViewOgunlerim(meals, lvOgunlerim);
+            }
         }
 
-        private void btnYeniUrun_Click(object sender, EventArgs e)
+        private void AssociateUserWithDay(Kullanici user, Gun day)
         {
-            Form5 form5 = new Form5();
-            form5.Owner = this;
-            form5.Show();
-            this.Hide();
+            if (!user.Gunler.Contains(day))
+            {
+                user.Gunler.Add(day);
+                _kullaniciRepository.RepUpdate(user);
+            }
         }
 
-        private void btnGetir_Click(object sender, EventArgs e)
+        private void UpdateUserInterface()
         {
-            UIMetotlari uim = new UIMetotlari();
-            GenericRepository<Urun> grUrun = new GenericRepository<Urun>();
-            List<Urun> urunler = new List<Urun>();
-            if (combKosulOperatoru.SelectedIndex != -1 && tbKosul.Text != "")
-            {
-                urunler = grUrun.RepGetByConditionUrun(combKosulOperatoru.SelectedIndex, tbKosul.Text);
-                uim.PopulateListView(urunler, lviewUrunler);
-            }
-            else
-            {
-                MessageBox.Show("Koşul seçmelisin");
-            }
-
-
+            var currentUser = _kullaniciRepository.RepGetByConditionKullanici(_userEmail);
+            _uiMetotlari.HedefKaloriHesaplaVeAta(progressBar1, lblHedefKalori, currentUser);
+            _uiMetotlari.AlinmisKaloriHesaplaVeGuncelle(lblAldigimKalori, _currentDate, progressBar1, _userEmail);
         }
 
         private void btnOgunEkle_Click(object sender, EventArgs e)
         {
+            if (!ValidateOgunInput())
+                return;
 
-            //poly table populate
-            //urun gramaji
-            double urunGramajDeger = 0;
-            if (tbGramaj.Text != "")
+            var mealDetails = CreateMealDetails();
+            if (mealDetails != null && !IsDuplicateMeal(mealDetails))
             {
-                urunGramajDeger = Convert.ToDouble((tbGramaj.Text));
+                SaveMealAndUpdateUI(mealDetails);
             }
-            else
+        }
+
+        private bool ValidateOgunInput()
+        {
+            if (combOgunTipi.SelectedIndex == -1)
+            {
+                MessageBox.Show("Lütfen öğün tipi seçin");
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(tbGramaj.Text))
+            {
                 tbGramaj.Text = "100";
-            double urununTutulanGramaji = 100;
+            }
 
-            //GunId için
-            GenericRepository<Gun> grGunP = new GenericRepository<Gun>();
-            Gun gunP = grGunP.RepGetByConditionGun(dt);
-            //userid içi
-            GenericRepository<Kullanici> grK = new GenericRepository<Kullanici>();
-            Kullanici kulP = grK.RepGetByConditionKullanici(usermail);
+            return true;
+        }
 
-            //UrunId için
+        private GunUrunDetay CreateMealDetails()
+        {
             try
             {
-                GenericRepository<Urun> grUrunP = new GenericRepository<Urun>();
-                Urun urunP = grUrunP.RepGetById(Convert.ToInt32(lviewUrunler.SelectedItems[0].SubItems[0].Text));
+                var selectedUrunId = Convert.ToInt32(lviewUrunler.SelectedItems[0].SubItems[0].Text);
+                var urun = _urunRepository.RepGetById(selectedUrunId);
+                var gramaj = Convert.ToDouble(tbGramaj.Text);
+                var alinmisKalori = gramaj * urun.Kalori / 100;
 
-                //alinmis cal hesabi
-                double alinmisKaloriP = urunGramajDeger * urunP.Kalori / urununTutulanGramaji;
-                GunUrunDetay gud = new GunUrunDetay();
-                gud.UrunGramaj = urunGramajDeger;
-                gud.AlinmisKalori = alinmisKaloriP;
-                gud.Gun = gunP;
-                gud.Urun = urunP;
-                gud.Kullanici = kulP;
-                if (combOgunTipi.SelectedIndex != -1)
+                return new GunUrunDetay
                 {
-                    gud.GununZamani = combOgunTipi.SelectedItem.ToString();
-                }
-
-                GenericRepository<GunUrunDetay> grGud = new GenericRepository<GunUrunDetay>();
-                GenericRepository<GunUrunDetay> grGud2 = new GenericRepository<GunUrunDetay>();
-                List<GunUrunDetay> gunUrunDetays1 = grGud2.RepGetAll();
-                int counter = 0;
-                foreach (GunUrunDetay gudd in gunUrunDetays1)
-                {
-                    if (gudd.UrunID == urunP.UrunID && gudd.GunID == gunP.GunID && gudd.UserID == kulP.UserID)
-                    {
-                        counter++;
-                    }
-
-                }
-
-                if (counter == 0 && combOgunTipi.SelectedIndex != -1)
-                    grGud.RepUpdate(gud);
-                else
-                    MessageBox.Show("Aynı üründen iki defa girmemelisin sil ve ya öğün tipi seçmeyi unuttun seç");
-
+                    UrunGramaj = gramaj,
+                    AlinmisKalori = alinmisKalori,
+                    Gun = _gunRepository.RepGetByConditionGun(_currentDate),
+                    Urun = urun,
+                    Kullanici = _kullaniciRepository.RepGetByConditionKullanici(_userEmail),
+                    GununZamani = combOgunTipi.SelectedItem.ToString()
+                };
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message);
+                MessageBox.Show($"Öğün eklenirken hata: {ex.Message}");
+                return null;
             }
+        }
 
+        private bool IsDuplicateMeal(GunUrunDetay meal)
+        {
+            return _gunUrunDetayRepository.RepGetAll()
+                .Any(m => m.UrunID == meal.UrunID &&
+                         m.GunID == meal.GunID &&
+                         m.UserID == meal.UserID);
+        }
 
-            UIMetotlari uim = new UIMetotlari();
-
-            GenericRepository<GunUrunDetay> gud23 = new GenericRepository<GunUrunDetay>();
-            List<GunUrunDetay> gudList = gud23.RepGetbyConditionGunUrunDetay(dt);
-            GenericRepository<Kullanici> grKul = new GenericRepository<Kullanici>();
-            Kullanici kul = grKul.RepGetByConditionKullanici(usermail);
-            List<GunUrunDetay> realGuds = new List<GunUrunDetay>();
-            foreach (GunUrunDetay gudi in gudList)
-            {
-                if (gudi.UserID == kul.UserID)
-                {
-                    realGuds.Add(gudi);
-                }
-            }
-            if (gudList.Count > 0)
-                uim.PopulateListViewOgunlerim(realGuds, lvOgunlerim);
-
-
-
-
-            GenericRepository<Kullanici> grKullanici = new GenericRepository<Kullanici>();
-
-            Kullanici girisYapanKullanici = grKullanici.RepGetByConditionKullanici(usermail);
-
-
-            //Erkekler için BMH = 66,47 + (13, 75 x kilo) +(5 x boy) -(6, 76 x yaş)
-            //Kadınlar için BMH = 655,10 + (9, 56 x kilo) +(1, 85 x boy) -(4, 68 x yaş)
-
-            double hedefKalori = 0;
-
-
-            uim.HedefKaloriHesaplaVeAta(progressBar1, lblHedefKalori, girisYapanKullanici);
-            uim.AlinmisKaloriHesaplaVeGuncelle(lblAldigimKalori, dt, progressBar1, usermail);
-
+        private void SaveMealAndUpdateUI(GunUrunDetay meal)
+        {
+            _gunUrunDetayRepository.RepUpdate(meal);
+            LoadUserMeals(_kullaniciRepository.RepGetByConditionKullanici(_userEmail));
+            UpdateUserInterface();
 
             if (progressBar1.Value >= progressBar1.Maximum)
-                MessageBox.Show("Boğazını mı tutsan acaba");
-
-
-
-        }
-
-        private void btnOgunSil_Click(object sender, EventArgs e)
-        {
-
-            if (lvOgunlerim.Items.Count == 0)
             {
-                MessageBox.Show("Listede Silecek öğün yoktur.");
+                MessageBox.Show("Günlük kalori limitinizi aştınız!");
             }
-
-
-            try
-            {
-
-
-                GenericRepository<GunUrunDetay> grGud = new GenericRepository<GunUrunDetay>();
-                List<GunUrunDetay> gudList = grGud.RepGetAll();
-                foreach (GunUrunDetay guD in gudList)
-                {
-                    if (guD.UrunID == Convert.ToInt32(lvOgunlerim.SelectedItems[0].SubItems[0].Text))
-                    {
-                        grGud.RepDelete(guD);
-                        break;
-                    }
-                }
-
-
-
-                GenericRepository<Kullanici> grKul = new GenericRepository<Kullanici>();
-                Kullanici kul = grKul.RepGetByConditionKullanici(usermail);
-                List<GunUrunDetay> gudListt = grGud.RepGetbyConditionGunUrunDetay(dt);
-                List<GunUrunDetay> realGuds = new List<GunUrunDetay>();
-                foreach (GunUrunDetay gudi in gudListt)
-                {
-                    if (gudi.UserID == kul.UserID)
-                    {
-                        realGuds.Add(gudi);
-                    }
-                }
-                UIMetotlari uim = new UIMetotlari();
-                uim.PopulateListViewOgunlerim(realGuds, lvOgunlerim);
-                GenericRepository<Kullanici> grUser = new GenericRepository<Kullanici>();
-                Kullanici user = grUser.RepGetByConditionKullanici(usermail);
-                uim.HedefKaloriHesaplaVeAta(progressBar1, lblHedefKalori, user);
-                uim.AlinmisKaloriHesaplaVeGuncelle(lblAldigimKalori, dt, progressBar1, usermail);
-            }
-            catch (Exception ex)
-            {
-
-                MessageBox.Show("Lütfen Silinecek ğün seçiniz!!");
-            }
-        }
-
-        private void raporlarımToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            Form6 form6 = new Form6();
-            form6.Owner = this;
-            form6.Show();
-            this.Hide();
-        }
-
-        private void btnExit_Click(object sender, EventArgs e)
-        {
-            this.Hide();
-
-            foreach (Control ctrl in this.Owner.Controls)
-            {
-                if (ctrl is GroupBox gb)
-                {
-                    foreach (Control c in gb.Controls)
-                    {
-                        if (c is System.Windows.Forms.TextBox tb)
-                        {
-                            tb.Clear();
-                        }
-                    }
-                }
-
-            }
-            this.Owner.Show();
-
-        }
-
-        private void lviewUrunler_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            try
-            {
-                GenericRepository<Urun> grUrun = new GenericRepository<Urun>();
-                Urun urun = grUrun.RepGetById(Convert.ToInt32(lviewUrunler.SelectedItems[0].SubItems[0].Text));
-                UIMetotlari uim = new UIMetotlari();
-
-                pictureBox1.Image = uim.ByteArrayToImage(urun.ImageData);
-            }
-            catch (Exception ex)
-            {
-
-                MessageBox.Show(ex.Message);
-            }
-        }
-
-        private void Form3_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            Application.Exit();
         }
     }
 }

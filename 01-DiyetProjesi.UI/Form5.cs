@@ -12,20 +12,65 @@ using System.Windows.Forms;
 
 namespace _01_DiyetProjesi.UI
 {
-    public partial class Form5 : Form
+    public partial class Form5 : BaseForm
     {
+        private readonly GenericRepository<Urun> _urunRepository;
+
         public Form5()
         {
             InitializeComponent();
+            _urunRepository = new GenericRepository<Urun>();
+        }
+
+        private void Form5_Load(object sender, EventArgs e)
+        {
+            InitializeCategories();
+        }
+
+        private void InitializeCategories()
+        {
+            var categories = new[]
+            {
+            "Et ve et ürünleri",
+            "Süt ve Süt ürünleri",
+            "Meyve Sebze",
+            "Unlu Mamül",
+            "Kuru bakliyat",
+            "İçecek",
+            "Atıştırmalık"
+        };
+
+            combKategori.Items.AddRange(categories);
         }
 
         private void btnYeniUrunEkle_Click(object sender, EventArgs e)
         {
-            UIMetotlari uim = new UIMetotlari();
-
-            if (tbUrunAdi.Text != "" && tbMarka.Text != "" && nudKalori.Value != 0 && combKategori.SelectedIndex != -1 && pictureBox1.Image != null/*&& nudCokluDoymamisYag.Value != 0 && nudTekliDoymamisYag.Value != 0 && nudSeker.Value != 0 && nudDoymusYag.Value != 0 && nudTransYag.Value != 0 && nudProtein.Value != 0 && nudKarbonhidrat.Value != 0 && nudSodyum.Value != 0 && nudFiber.Value != 0 && nudPotasyum.Value != 0*/)
+            if (!ValidateProductInput())
             {
-                Urun yeniUrun = new Urun()
+                MessageBox.Show("Lütfen gerekli alanları doldurun.");
+                return;
+            }
+
+            if (SaveNewProduct())
+            {
+                MessageBox.Show("Ürün ekleme başarılı");
+            }
+        }
+
+        private bool ValidateProductInput()
+        {
+            return !string.IsNullOrWhiteSpace(tbUrunAdi.Text) &&
+                   !string.IsNullOrWhiteSpace(tbMarka.Text) &&
+                   nudKalori.Value > 0 &&
+                   combKategori.SelectedIndex != -1 &&
+                   pictureBox1.Image != null;
+        }
+
+        private bool SaveNewProduct()
+        {
+            try
+            {
+                var newProduct = new Urun
                 {
                     UrunAdi = tbUrunAdi.Text,
                     Marka = tbMarka.Text,
@@ -41,52 +86,29 @@ namespace _01_DiyetProjesi.UI
                     Fiber = (double)nudFiber.Value,
                     Potasyum = (double)nudPotasyum.Value,
                     Kategori = combKategori.SelectedItem.ToString(),
-                    ImageData = uim.ImageToByteArray(pictureBox1.Image)
+                    ImageData = _uiMetotlari.ImageToByteArray(pictureBox1.Image)
                 };
 
-                GenericRepository<Urun> grUrun = new GenericRepository<Urun>();
-                grUrun.RepUpdate(yeniUrun);
-                MessageBox.Show("Ürün ekleme başarılı");
+                _urunRepository.RepUpdate(newProduct);
+                return true;
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show("Boş alan bırakmamalısın");
+                MessageBox.Show($"Ürün eklenirken hata: {ex.Message}");
+                return false;
             }
-
-        }
-
-        private void btnUrunSecimi_Click(object sender, EventArgs e)
-        {
-            this.Owner.Show();
-            this.Hide();
-
-        }
-
-        private void Form5_Load(object sender, EventArgs e)
-        {
-            combKategori.Items.Add("Et ve et ürünleri");
-            combKategori.Items.Add("Süt ve Süt ürünleri");
-            combKategori.Items.Add("Meyve Sebze");
-            combKategori.Items.Add("Unlu Mamül");
-            combKategori.Items.Add("Kuru bakliyat");
-            combKategori.Items.Add("İçecek");
-            combKategori.Items.Add("Atıştırmalık");
         }
 
         private void btnResimSec_Click(object sender, EventArgs e)
         {
-
-            OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "Image Files(*.jpg; *.jpeg; *.png; *.bmp)|*.jpg; *.jpeg; *.png; *.bmp";
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            using (var openFileDialog = new OpenFileDialog())
             {
-                pictureBox1.Image = new System.Drawing.Bitmap(openFileDialog.FileName);
+                openFileDialog.Filter = "Image Files(*.jpg; *.jpeg; *.png; *.bmp)|*.jpg; *.jpeg; *.png; *.bmp";
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    pictureBox1.Image = new Bitmap(openFileDialog.FileName);
+                }
             }
-        }
-
-        private void Form5_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            Application.Exit();
         }
     }
 }

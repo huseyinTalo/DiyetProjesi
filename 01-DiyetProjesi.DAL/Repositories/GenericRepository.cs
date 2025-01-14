@@ -62,7 +62,7 @@ namespace _01_DiyetProjesi.DATA.Repositories
                 Gun gu = context.Gunler.FirstOrDefault(x => x.BugununTarihi.Date == dtt.Date);
                 return gu;
             }
-            catch(Exception) 
+            catch (Exception)
             {
                 throw new Exception("Getirme işi yaş");
             }

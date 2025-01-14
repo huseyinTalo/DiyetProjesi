@@ -15,104 +15,93 @@ using System.Diagnostics.Metrics;
 
 namespace _01_DiyetProjesi.UI
 {
-    public partial class Form2 : Form
+    public partial class Form2 : BaseForm
     {
+        private readonly GenericRepository<Kullanici> _kullaniciRepository;
+
         public Form2()
         {
             InitializeComponent();
+            _kullaniciRepository = new GenericRepository<Kullanici>();
+        }
+
+        private void Form2_Load(object sender, EventArgs e)
+        {
+            InitializeGenderComboBox();
+        }
+
+        private void InitializeGenderComboBox()
+        {
+            cbCinsiyet.Items.AddRange(new[] { "Erkek", "Kadın" });
         }
 
         private void btnUyeOl_Click(object sender, EventArgs e)
         {
-            UIMetotlari uim = new UIMetotlari();
-            if (tbEmail.Text != "" && tbIsim.Text != "" && tbSoyisim.Text != "" && tbMevcutKilo.Text != "" && tbSifre.Text != "" && tbHedefKilo.Text != "" && tbBoy.Text != "" && cbCinsiyet.SelectedIndex != -1 && dtpDogum.Value != DateTime.Now && uim.IsValidEmail(tbEmail.Text) && uim.IsValidPassword(tbSifre.Text) && !(DateTime.Now.Year - dtpDogum.Value.Year < 18))
+            if (!ValidateRegistrationForm())
             {
-                GenericRepository<Kullanici> grKullanici = new GenericRepository<Kullanici>();
-                List<Kullanici> kullaniciList = grKullanici.RepGetAll();
+                MessageBox.Show("Lütfen tüm alanları doldurun ve geçerli bilgiler girin.");
+                return;
+            }
 
+            if (TryCreateUser(out var newUser) && SaveUser(newUser))
+            {
+                MessageBox.Show("Üyelik başarılı");
+            }
+        }
 
+        private bool ValidateRegistrationForm()
+        {
+            return !string.IsNullOrWhiteSpace(tbEmail.Text) &&
+                   !string.IsNullOrWhiteSpace(tbIsim.Text) &&
+                   !string.IsNullOrWhiteSpace(tbSoyisim.Text) &&
+                   !string.IsNullOrWhiteSpace(tbMevcutKilo.Text) &&
+                   !string.IsNullOrWhiteSpace(tbSifre.Text) &&
+                   !string.IsNullOrWhiteSpace(tbHedefKilo.Text) &&
+                   !string.IsNullOrWhiteSpace(tbBoy.Text) &&
+                   cbCinsiyet.SelectedIndex != -1 &&
+                   dtpDogum.Value != DateTime.Now &&
+                   _uiMetotlari.IsValidEmail(tbEmail.Text) &&
+                   _uiMetotlari.IsValidPassword(tbSifre.Text) &&
+                   (DateTime.Now.Year - dtpDogum.Value.Year >= 18);
+        }
 
-
-                Kullanici kullanici = new Kullanici()
+        private bool TryCreateUser(out Kullanici user)
+        {
+            try
+            {
+                user = new Kullanici
                 {
                     Email = tbEmail.Text,
                     Adi = tbIsim.Text,
                     Soyadi = tbSoyisim.Text,
                     GuncelKilo = Convert.ToDouble(tbMevcutKilo.Text),
                     HedefKilo = Convert.ToDouble(tbHedefKilo.Text),
-
                     Boy = Convert.ToInt32(tbBoy.Text),
                     Sex = cbCinsiyet.SelectedItem.ToString(),
                     Password = tbSifre.Text,
                     KayitTarihi = DateTime.Now,
-                    DogumTarihi = dtpDogum.Value,
-
-
+                    DogumTarihi = dtpDogum.Value
                 };
-                if (kullaniciList.Count == 0)
-                {
-                    grKullanici.RepUpdate(kullanici);
-                    MessageBox.Show("Üyelik başarılı");
-                }
-                else
-                {
-                    int counter = 0;
-                    foreach (Kullanici kullan in kullaniciList)
-                    {
-
-                        if (kullan.Email != tbEmail.Text)
-                        {
-                            counter++;
-                        }
-
-
-                    }
-
-                    if (counter == kullaniciList.Count)
-                    {
-                        grKullanici.RepUpdate(kullanici);
-                        MessageBox.Show("Üyelik başarılı");
-                    }
-                    else
-                    {
-                        MessageBox.Show("Bu email kullanılmakta");
-                    }
-                }
-
-
-
+                return true;
             }
-            else
-                MessageBox.Show("Ekleme işlemi başarısız... Formu tamamen doldurmalısınız");
-        }
-
-        private void Form2_Load(object sender, EventArgs e)
-        {
-            cbCinsiyet.Items.Add("Erkek");
-            cbCinsiyet.Items.Add("Kadın");
-        }
-
-        private void cbSifreGor_CheckedChanged(object sender, EventArgs e)
-        {
-            if (cbSifreGor.Checked)
+            catch
             {
-                tbSifre.PasswordChar = '\0';
+                user = null;
+                return false;
             }
-            else
+        }
+
+        private bool SaveUser(Kullanici user)
+        {
+            var existingUsers = _kullaniciRepository.RepGetAll();
+            if (existingUsers.Any(u => u.Email == user.Email))
             {
-                tbSifre.PasswordChar = '*';
+                MessageBox.Show("Bu email kullanılmakta");
+                return false;
             }
-        }
 
-        private void btnGirisDon_Click(object sender, EventArgs e)
-        {
-            this.Hide();
-            this.Owner.Show();
-        }
-
-        private void Form2_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            Application.Exit();
+            _kullaniciRepository.RepUpdate(user);
+            return true;
         }
     }
 }

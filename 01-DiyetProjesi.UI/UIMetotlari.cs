@@ -1,40 +1,48 @@
 ﻿using _01_DiyetProjesi.DATA.Entities;
 using _01_DiyetProjesi.DATA.Repositories;
-using Castle.Components.DictionaryAdapter.Xml;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using System.Drawing;
 
 namespace _01_DiyetProjesi.UI
 {
     public class UIMetotlari
     {
-        string fllpath = @"C:\Users\79153\Documents\DiyetProject\UserRememberance.txt";
-        public bool GirisKontrolu(Form mevcutForm, Form acılacakForm, TextBox email, TextBox sifre)
+        private const string FILE_PATH = @"C:\Users\79153\Documents\DiyetProject\UserRememberance.txt";
+        private const string DIRECTORY_PATH = @"C:\Users\79153\Documents\DiyetProject";
+        private const string FILE_NAME = "UserRememberance.txt";
+
+        private readonly GenericRepository<Kullanici> _kullaniciRepository;
+        private readonly GenericRepository<GunUrunDetay> _gunUrunDetayRepository;
+        private readonly GenericRepository<Urun> _urunRepository;
+
+        public UIMetotlari()
         {
-            GenericRepository<Kullanici> gr = new GenericRepository<Kullanici>();
+            _kullaniciRepository = new GenericRepository<Kullanici>();
+            _gunUrunDetayRepository = new GenericRepository<GunUrunDetay>();
+            _urunRepository = new GenericRepository<Urun>();
+        }
+
+        public bool GirisKontrolu(Form mevcutForm, Form acilacakForm, TextBox email, TextBox sifre)
+        {
             try
             {
-                List<Kullanici> kullaniciList = gr.RepGetAll();
+                var kullaniciList = _kullaniciRepository.RepGetAll();
+                var kullanici = kullaniciList.FirstOrDefault(k => k.Email == email.Text && k.Password == sifre.Text);
 
-                foreach (Kullanici kul in kullaniciList)
+                if (kullanici != null)
                 {
-                    if (kul.Email == email.Text && kul.Password == sifre.Text)
-                    {
-                        acılacakForm.Owner = mevcutForm;
-                        acılacakForm.Show();
-                        mevcutForm.Hide();
-                        return true;
-                    }
+                    acilacakForm.Owner = mevcutForm;
+                    acilacakForm.Show();
+                    mevcutForm.Hide();
+                    return true;
                 }
                 return false;
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
+                throw new Exception($"Giriş kontrolünde hata: {ex.Message}");
             }
         }
 
@@ -42,27 +50,20 @@ namespace _01_DiyetProjesi.UI
         {
             try
             {
-                string directoryPath = @"C:\Users\79153\Documents\DiyetProject";
-                string fileName = "UserRememberance.txt";
-                string fullPath = Path.Combine(directoryPath, fileName);
-                fllpath = fullPath;
-
-                if (!Directory.Exists(directoryPath))
+                if (!Directory.Exists(DIRECTORY_PATH))
                 {
-
-                    Directory.CreateDirectory(directoryPath);
+                    Directory.CreateDirectory(DIRECTORY_PATH);
                 }
 
-
+                string fullPath = Path.Combine(DIRECTORY_PATH, FILE_NAME);
                 if (!File.Exists(fullPath))
                 {
-                    StreamWriter sw = File.CreateText(fullPath);
-                    sw.Close();
+                    using (StreamWriter sw = File.CreateText(fullPath)) { }
                 }
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
+                throw new Exception($"Hatırlama dosyası oluşturulurken hata: {ex.Message}");
             }
         }
 
@@ -70,34 +71,23 @@ namespace _01_DiyetProjesi.UI
         {
             try
             {
-                File.WriteAllText(fllpath, string.Empty);
-                using (StreamWriter sw = new StreamWriter(fllpath))
+                File.WriteAllText(FILE_PATH, string.Empty);
+                using (StreamWriter sw = new StreamWriter(FILE_PATH))
                 {
-                    foreach (Control ctrl in form3.Owner.Controls)
+                    var gbControls = form3.Owner.Controls.OfType<GroupBox>();
+                    foreach (var gb in gbControls)
                     {
-                        if (ctrl is GroupBox gb)
+                        var cbBeniHatirla = gb.Controls.OfType<CheckBox>()
+                            .FirstOrDefault(cb => cb.Name == "cbBeniHatirla" && cb.Checked);
+
+                        if (cbBeniHatirla != null)
                         {
-                            foreach (Control ctrl2 in gb.Controls)
+                            var tbEmail = gb.Controls.OfType<TextBox>()
+                                .FirstOrDefault(tb => tb.Name == "tbEmail");
+
+                            if (tbEmail != null)
                             {
-                                if (ctrl2 is CheckBox cb)
-                                {
-                                    if (cb.Checked && cb.Name == "cbBeniHatirla")
-                                    {
-                                        foreach (Control cctrl in gb.Controls)
-                                        {
-                                            if (cctrl is TextBox tb)
-                                            {
-                                                if (tb.Name == "tbEmail")
-                                                {
-                                                    sw.Write(tb.Text);
-
-                                                }
-                                            }
-                                        }
-                                    }
-
-
-                                }
+                                sw.Write(tbEmail.Text);
                             }
                         }
                     }
@@ -105,7 +95,7 @@ namespace _01_DiyetProjesi.UI
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
+                throw new Exception($"Hatırlama bilgisi eklenirken hata: {ex.Message}");
             }
         }
 
@@ -113,488 +103,142 @@ namespace _01_DiyetProjesi.UI
         {
             try
             {
-                using (StreamReader sr = new StreamReader(fllpath))
+                using (StreamReader sr = new StreamReader(FILE_PATH))
                 {
                     tb.Text = sr.ReadLine();
                 }
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
+                throw new Exception($"Hatırlama bilgisi okunurken hata: {ex.Message}");
             }
-
         }
 
-        public void PopulateListView(List<Urun> urunler, ListView listView1)
+        public void InitializeListView(ListView listView)
         {
-
-            listView1.Items.Clear();
             try
             {
+                ConfigureListViewBase(listView);
 
-                int i = 0;
-                foreach (Urun urun in urunler)
+                var columns = new Dictionary<string, int>
                 {
-                    listView1.Items.Add(urun.UrunID.ToString());
-                    listView1.Items[i].SubItems.Add(urun.UrunAdi);
-                    listView1.Items[i].SubItems.Add(urun.Marka);
-                    listView1.Items[i].SubItems.Add(urun.Kalori.ToString());
-                    listView1.Items[i].SubItems.Add(urun.DoymusYag.ToString());
-                    listView1.Items[i].SubItems.Add(urun.TransYag.ToString());
-                    listView1.Items[i].SubItems.Add(urun.CokluDoymamisYag.ToString());
-                    listView1.Items[i].SubItems.Add(urun.TekliDoymamisYag.ToString());
-                    listView1.Items[i].SubItems.Add(urun.Karbonhidrat.ToString());
-                    listView1.Items[i].SubItems.Add(urun.Seker.ToString());
-                    listView1.Items[i].SubItems.Add(urun.Protein.ToString());
-                    listView1.Items[i].SubItems.Add(urun.Sodyum.ToString());
-                    listView1.Items[i].SubItems.Add(urun.Potasyum.ToString());
-                    listView1.Items[i].SubItems.Add(urun.Fiber.ToString());
-                    listView1.Items[i].SubItems.Add(urun.Kategori);
-                    i++;
-                }
+                    {"ID", 60},
+                    {"Ürün Adı", 180},
+                    {"Marka", 180},
+                    {"Kalori", 180},
+                    {"Doymuş Yağ", 180},
+                    {"Trans Yağ", 180},
+                    {"Tekli Doymamış Yağ", 360},
+                    {"Çoklu Doymamış Yağ", 360},
+                    {"Protein", 120},
+                    {"Karbonhidrat", 180},
+                    {"Şeker", 120},
+                    {"Sodyum", 120},
+                    {"Fiber", 120},
+                    {"Potasyum", 120},
+                    {"Kategori", 120}
+                };
 
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-
-
-        }
-
-        public void InitializeListView(ListView listView1)
-        {
-            try
-            {
-
-
-                listView1.Enabled = true;
-
-                listView1.View = View.Details;
-                listView1.AllowColumnReorder = true;
-
-                listView1.FullRowSelect = true;
-                listView1.GridLines = true;
-
-                listView1.Columns.Add("ID", 60);
-                listView1.Columns.Add("Ürün Adı", 180);
-                listView1.Columns.Add("Marka", 180);
-                listView1.Columns.Add("Kalori", 180);
-                listView1.Columns.Add("Doymuş Yağ", 180);
-                listView1.Columns.Add("Trans Yağ", 180);
-                listView1.Columns.Add("Tekli Doymamış Yağ", 360);
-                listView1.Columns.Add("Çoklu Doymamış Yağ", 360);
-                listView1.Columns.Add("Protein", 120);
-                listView1.Columns.Add("Karbonhidrat", 180);
-                listView1.Columns.Add("Şeker", 120);
-                listView1.Columns.Add("Sodyum", 120);
-                listView1.Columns.Add("Fiber", 120);
-                listView1.Columns.Add("Potasyum", 120);
-                listView1.Columns.Add("Kategori", 120);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-
-        }
-
-        public void InitializeListViewOgunlerim(ListView listView1)
-        {
-            try
-            {
-
-
-                listView1.Enabled = true;
-
-                listView1.View = View.Details;
-                listView1.AllowColumnReorder = true;
-
-                listView1.FullRowSelect = true;
-                listView1.GridLines = true;
-
-                listView1.Columns.Add("ID", 60);
-                listView1.Columns.Add("Ürün Adı", 180);
-                listView1.Columns.Add("Gramaj", 180);
-                listView1.Columns.Add("Alınan Kalori", 240);
-                listView1.Columns.Add("Öğün Tipi", 180);
-                listView1.Columns.Add("Ürün Kategorisi", 180);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-        }
-        public void PopulateListViewOgunlerim(List<GunUrunDetay> gunUrunDetays, ListView listView1)
-        {
-            listView1.Items.Clear();
-            try
-            {
-                int i = 0;
-                foreach (GunUrunDetay urun in gunUrunDetays)
+                foreach (var column in columns)
                 {
-                    listView1.Items.Add(urun.UrunID.ToString());
-                    listView1.Items[i].SubItems.Add(urun.Urun.UrunAdi);
-                    listView1.Items[i].SubItems.Add(urun.UrunGramaj.ToString());
-                    listView1.Items[i].SubItems.Add(urun.AlinmisKalori.ToString());
-                    listView1.Items[i].SubItems.Add(urun.GununZamani);
-                    listView1.Items[i].SubItems.Add(urun.Urun.Kategori);
-                    i++;
+                    listView.Columns.Add(column.Key, column.Value);
                 }
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
-            }
-        }
-        public void HedefKaloriHesaplaVeAta(ProgressBar progressBar1, Label lblHedefKalori, Kullanici kullanici)
-        {
-
-            double boy = kullanici.Boy;
-            double kilo = kullanici.HedefKilo;
-            double yas = DateTime.Now.Year - kullanici.DogumTarihi.Year;
-            double hedefKalori = 0;
-
-            try
-            {
-
-
-
-                if (kullanici.Sex == "Erkek")
-                {
-                    hedefKalori = 66.47 + (13.75 * kilo) + (5 * boy) - (6.76 * yas);
-                }
-                else
-                {
-                    hedefKalori = 655.10 + (9.56 * kilo) + (1.85 * boy) - (4.68 * yas);
-                }
-
-
-                lblHedefKalori.Text = hedefKalori.ToString();
-
-
-                progressBar1.Maximum = Convert.ToInt32(hedefKalori);
-
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
+                throw new Exception($"ListView başlatılırken hata: {ex.Message}");
             }
         }
 
-        public void AlinmisKaloriHesaplaVeGuncelle(Label lbl, DateTime dt, ProgressBar pb, string usermail)
+        private void ConfigureListViewBase(ListView listView)
+        {
+            listView.Enabled = true;
+            listView.View = View.Details;
+            listView.AllowColumnReorder = true;
+            listView.FullRowSelect = true;
+            listView.GridLines = true;
+        }
+
+        public void PopulateListView(List<Urun> urunler, ListView listView)
         {
             try
             {
-                GenericRepository<GunUrunDetay> grGudLab = new GenericRepository<GunUrunDetay>();
-                GenericRepository<Kullanici> grKul = new GenericRepository<Kullanici>();
-                Kullanici kul = grKul.RepGetByConditionKullanici(usermail);
-                List<GunUrunDetay> gunUrunDetays = grGudLab.RepGetAll();
-                double alinmisKaloriToplam = 0;
-                if (gunUrunDetays.Count > 0)
-                    foreach (GunUrunDetay gunUrunDetay in gunUrunDetays)
+                listView.Items.Clear();
+                for (int i = 0; i < urunler.Count; i++)
+                {
+                    var urun = urunler[i];
+                    var item = new ListViewItem(new[]
                     {
-                        if (gunUrunDetay.Gun.BugununTarihi == dt && gunUrunDetay.UserID == kul.UserID)
-                        {
-                            alinmisKaloriToplam += gunUrunDetay.AlinmisKalori;
-                        }
-                    }
-                lbl.Text = alinmisKaloriToplam.ToString();
-                pb.Value = (int)alinmisKaloriToplam;
+                        urun.UrunID.ToString(),
+                        urun.UrunAdi,
+                        urun.Marka,
+                        urun.Kalori.ToString(),
+                        urun.DoymusYag.ToString(),
+                        urun.TransYag.ToString(),
+                        urun.CokluDoymamisYag.ToString(),
+                        urun.TekliDoymamisYag.ToString(),
+                        urun.Karbonhidrat.ToString(),
+                        urun.Seker.ToString(),
+                        urun.Protein.ToString(),
+                        urun.Sodyum.ToString(),
+                        urun.Potasyum.ToString(),
+                        urun.Fiber.ToString(),
+                        urun.Kategori
+                    });
+                    listView.Items.Add(item);
+                }
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
+                throw new Exception($"ListView doldurulurken hata: {ex.Message}");
             }
         }
+
+      
+
+       
 
         public bool IsValidEmail(string email)
         {
+            const string EMAIL_PATTERN = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
             try
             {
-
-                string pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
-                Regex regex = new Regex(pattern);
-                if (regex.IsMatch(email))
-                {
+                if (Regex.IsMatch(email, EMAIL_PATTERN))
                     return true;
-                }
-                else
-                {
-                    MessageBox.Show("Lütfen mail formatında bir şey giriniz.");
-                    return false;
-                }
+
+                MessageBox.Show("Lütfen geçerli bir e-posta adresi giriniz.");
+                return false;
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
+                throw new Exception($"E-posta doğrulama hatası: {ex.Message}");
             }
         }
 
         public bool IsValidPassword(string password)
         {
-            // Regex pattern for complex password:
-            // - At least 8 characters long
-            // - Contains at least one uppercase letter
-            // - Contains at least one lowercase letter
-            // - Contains at least one number
-            // - Contains at least one special character
+            const string PASSWORD_PATTERN = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?.&])[A-Za-z\d@$!%*?&]{8,}$";
             try
             {
-                string pattern = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?.&])[A-Za-z\d@$!%*?&]{8,}$";
-                Regex regex = new Regex(pattern);
-                if (regex.IsMatch(password))
-                {
+                if (Regex.IsMatch(password, PASSWORD_PATTERN))
                     return true;
-                }
-                else
-                {
-                    MessageBox.Show("Şifre en az 8 karakter olmalı bir büyük bir küçük harf içermeli en az bir numara ve özel karakter içermeli.");
-                    return false;
-                }
+
+                MessageBox.Show("Şifre en az 8 karakter olmalı, bir büyük harf, bir küçük harf, " +
+                              "bir rakam ve bir özel karakter içermelidir.");
+                return false;
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
+                throw new Exception($"Şifre doğrulama hatası: {ex.Message}");
             }
         }
 
-        public void EnCokTercihEdilenYemek(Kullanici kul, Label lbl)
-        {
-            try
-            {
-
-                GenericRepository<GunUrunDetay> genericRepository = new GenericRepository<GunUrunDetay>();
-                List<GunUrunDetay> gudList = genericRepository.RepGetAll();
-                List<int> gudListoresult = new List<int>();
-                foreach (GunUrunDetay gud in gudList)
-                {
-                    if (gud.UserID == kul.UserID)
-                    {
-                        gudListoresult.Add(gud.UrunID);
-                    }
-                }
-                GenericRepository<Urun> grUrun = new GenericRepository<Urun>();
-                Urun urun = grUrun.RepGetById(FindMostRepeatedNumber(gudListoresult));
-
-                lbl.Text = urun.UrunAdi + " " + urun.Kategori;
-
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-        }
-        public void EnCokTercihEdilenYemek(Label lbl)
-        {
-            try
-            {
-                GenericRepository<GunUrunDetay> genericRepository = new GenericRepository<GunUrunDetay>();
-
-                List<GunUrunDetay> gudList = genericRepository.RepGetAll();
-                List<int> gudListoresult = new List<int>();
-                foreach (GunUrunDetay gud in gudList)
-                {
-                    gudListoresult.Add(gud.UrunID);
-                }
-                GenericRepository<Urun> grUrun = new GenericRepository<Urun>();
-                Urun urun = grUrun.RepGetById(FindMostRepeatedNumber(gudListoresult));
-
-                lbl.Text = urun.UrunAdi + " " + urun.Kategori;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-        }
-
-        public void EnCokTercihEdilenOgunum(Label lbl)
-        {
-            try
-            {
-
-                GenericRepository<GunUrunDetay> grGud = new GenericRepository<GunUrunDetay>();
-                List<GunUrunDetay> gunUrunDetays = grGud.RepGetAll();
-                List<string> strings = new List<string>();
-                foreach (GunUrunDetay gud in gunUrunDetays)
-                {
-
-                    strings.Add(gud.GununZamani);
-
-                }
-                lbl.Text = FindMostRepeatedWord(strings);
-
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-        }
-        public void EnCokTercihEdilenOgunum(Kullanici kul, Label lbl)
-        {
-            try
-            {
-                GenericRepository<GunUrunDetay> grGud = new GenericRepository<GunUrunDetay>();
-                List<GunUrunDetay> gunUrunDetays = grGud.RepGetAll();
-                List<string> strings = new List<string>();
-                foreach (GunUrunDetay gud in gunUrunDetays)
-                {
-                    if (kul.UserID == gud.UserID)
-                    {
-                        strings.Add(gud.GununZamani);
-                    }
-                }
-                lbl.Text = FindMostRepeatedWord(strings);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-        }
-        static int FindMostRepeatedNumber(List<int> numbers)
-        {
-            try
-            {
-
-
-                if (numbers == null || numbers.Count == 0)
-                    throw new ArgumentException("The list cannot be null or empty");
-
-                Dictionary<int, int> countDictionary = new Dictionary<int, int>();
-
-                foreach (int number in numbers)
-                {
-                    if (countDictionary.ContainsKey(number))
-                    {
-                        countDictionary[number]++;
-                    }
-                    else
-                    {
-                        countDictionary[number] = 1;
-                    }
-                }
-
-                int mostRepeatedNumber = numbers[0];
-                int maxCount = countDictionary[mostRepeatedNumber];
-
-                foreach (var pair in countDictionary)
-                {
-                    if (pair.Value > maxCount)
-                    {
-                        mostRepeatedNumber = pair.Key;
-                        maxCount = pair.Value;
-                    }
-                }
-
-                return mostRepeatedNumber;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-        }
-        static string FindMostRepeatedWord(List<string> words)
-        {
-            try
-            {
-                if (words == null || words.Count == 0)
-                    return null;
-                Dictionary<string, int> wordCounts = new Dictionary<string, int>();
-                foreach (string word in words)
-                {
-                    if (wordCounts.ContainsKey(word))
-                    {
-                        wordCounts[word]++;
-                    }
-                    else
-                    {
-                        wordCounts[word] = 1;
-                    }
-                }
-                string mostRepeatedWord = null;
-                int maxCount = 0;
-
-                foreach (var kvp in wordCounts)
-                {
-                    if (kvp.Value > maxCount)
-                    {
-                        maxCount = kvp.Value;
-                        mostRepeatedWord = kvp.Key;
-                    }
-                }
-                return mostRepeatedWord;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-        }
-
-        public void InitializeListViewRaporum(ListView listView1)
-        {
-            try
-            {
-
-                listView1.Enabled = true;
-                listView1.View = View.Details;
-                listView1.AllowColumnReorder = true;
-                listView1.FullRowSelect = true;
-                listView1.GridLines = true;
-                listView1.Columns.Add("Gun", 60);
-                listView1.Columns.Add("Urun", 180);
-                listView1.Columns.Add("Kategori", 180);
-                listView1.Columns.Add("Gramaj", 180);
-                listView1.Columns.Add("Kalori", 180);
-                listView1.Columns.Add("Ogun", 180);
-
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-
-        }
-
-        public void PopulateListViewRaporum(ListView listView1, Kullanici kul)
-        {
-            try
-            {
-                GenericRepository<GunUrunDetay> grGud = new GenericRepository<GunUrunDetay>();
-                List<GunUrunDetay> gunUrunDetays = new List<GunUrunDetay>();
-                List<GunUrunDetay> gunUrunDetays1 = grGud.RepGetAll();
-                foreach (GunUrunDetay gud in gunUrunDetays1)
-                {
-                    if (gud.UserID == kul.UserID)
-                    {
-                        gunUrunDetays.Add(gud);
-                    }
-                }
-
-                listView1.Items.Clear();
-
-                int i = 0;
-                foreach (GunUrunDetay urun in gunUrunDetays)
-                {
-                    listView1.Items.Add(urun.Gun.BugununTarihi.ToString());
-                    listView1.Items[i].SubItems.Add(urun.Urun.UrunAdi);
-                    listView1.Items[i].SubItems.Add(urun.Urun.Kategori);
-                    listView1.Items[i].SubItems.Add(urun.UrunGramaj.ToString());
-                    listView1.Items[i].SubItems.Add(urun.AlinmisKalori.ToString());
-                    listView1.Items[i].SubItems.Add(urun.GununZamani);
-                    i++;
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-
-        }
+        // Image handling utilities
         public byte[] ImageToByteArray(Image image)
         {
             try
             {
-                using (MemoryStream ms = new MemoryStream())
+                using (var ms = new MemoryStream())
                 {
                     image.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
                     return ms.ToArray();
@@ -602,25 +246,231 @@ namespace _01_DiyetProjesi.UI
             }
             catch (Exception ex)
             {
-                throw new Exception(ex.Message);
+                throw new Exception($"Resim byte dizisine dönüştürülürken hata: {ex.Message}");
             }
         }
+
         public Image ByteArrayToImage(byte[] byteArray)
         {
             try
             {
-                using (MemoryStream memoryStream = new MemoryStream(byteArray))
+                using (var ms = new MemoryStream(byteArray))
                 {
-                    Image image = Image.FromStream(memoryStream);
-                    return image;
+                    return Image.FromStream(ms);
                 }
             }
-            catch (Exception ex) 
-            { 
-                throw new Exception(ex.Message); 
+            catch (Exception ex)
+            {
+                throw new Exception($"Byte dizisi resme dönüştürülürken hata: {ex.Message}");
+            }
+        }
+        /// <summary>
+        /// Kullanıcının belirli bir gün için almış olduğu toplam kaloriyi hesaplar ve arayüzü günceller.
+        /// </summary>
+        /// <param name="lbl">Alınan kalori miktarını gösterecek Label kontrolü</param>
+        /// <param name="dt">Hesaplanacak gün</param>
+        /// <param name="pb">İlerleme durumunu gösterecek ProgressBar kontrolü</param>
+        /// <param name="usermail">Kullanıcının email adresi</param>
+        /// <exception cref="Exception">Kalori hesaplama sırasında oluşan hatalar için fırlatılır</exception>
+        public void AlinmisKaloriHesaplaVeGuncelle(Label lbl, DateTime dt, ProgressBar pb, string usermail)
+        {
+            try
+            {
+                var gunUrunDetayRepo = new GenericRepository<GunUrunDetay>();
+                var kullaniciRepo = new GenericRepository<Kullanici>();
+
+                var kullanici = kullaniciRepo.RepGetByConditionKullanici(usermail);
+                var gunUrunDetaylar = gunUrunDetayRepo.RepGetAll();
+
+                double totalCalories = 0;
+
+                if (gunUrunDetaylar.Any())
+                {
+                    totalCalories = gunUrunDetaylar
+                        .Where(gud => gud.Gun.BugununTarihi == dt && gud.UserID == kullanici.UserID)
+                        .Sum(gud => gud.AlinmisKalori);
+                }
+
+                lbl.Text = totalCalories.ToString();
+                pb.Value = (int)totalCalories;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Kalori hesaplama hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Harris-Benedict denklemi kullanarak kullanıcının hedef kalori miktarını hesaplar ve arayüzü günceller.
+        /// </summary>
+        /// <param name="progressBar1">Kalori alımı ilerleme durumunu gösterecek ProgressBar kontrolü</param>
+        /// <param name="lblHedefKalori">Hedef kalori miktarını gösterecek Label kontrolü</param>
+        /// <param name="kullanici">Kalori hesaplaması yapılacak kullanıcı</param>
+        /// <exception cref="Exception">Hedef kalori hesaplama sırasında oluşan hatalar için fırlatılır</exception>
+        public void HedefKaloriHesaplaVeAta(ProgressBar progressBar1, Label lblHedefKalori, Kullanici kullanici)
+        {
+            try
+            {
+                double boy = kullanici.Boy;
+                double kilo = kullanici.HedefKilo;
+                double yas = DateTime.Now.Year - kullanici.DogumTarihi.Year;
+
+                // Harris-Benedict denklemi
+                double hedefKalori = kullanici.Sex == "Erkek"
+                    ? 66.47 + (13.75 * kilo) + (5 * boy) - (6.76 * yas)
+                    : 655.10 + (9.56 * kilo) + (1.85 * boy) - (4.68 * yas);
+
+                lblHedefKalori.Text = hedefKalori.ToString();
+                progressBar1.Maximum = Convert.ToInt32(hedefKalori);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Hedef kalori hesaplama hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Belirli bir kullanıcının en çok tercih ettiği yemeği bulur ve ilgili etikette gösterir.
+        /// </summary>
+        /// <param name="kul">İşlem yapılacak kullanıcı</param>
+        /// <param name="lbl">Sonucu gösterecek Label kontrolü</param>
+        /// <exception cref="Exception">En çok tercih edilen yemek hesaplanırken oluşan hatalar için fırlatılır</exception>
+        public void EnCokTercihEdilenYemek(Kullanici kul, Label lbl)
+        {
+            try
+            {
+                var gudRepository = new GenericRepository<GunUrunDetay>();
+                var urunRepository = new GenericRepository<Urun>();
+
+                var kullaniciUrunler = gudRepository.RepGetAll()
+                    .Where(gud => gud.UserID == kul.UserID)
+                    .Select(gud => gud.UrunID);
+
+                if (!kullaniciUrunler.Any())
+                {
+                    lbl.Text = "Henüz yemek tercihi yok";
+                    return;
+                }
+
+                var mostFrequentUrunId = kullaniciUrunler
+                    .GroupBy(id => id)
+                    .OrderByDescending(g => g.Count())
+                    .First()
+                    .Key;
+
+                var urun = urunRepository.RepGetById(mostFrequentUrunId);
+                lbl.Text = $"{urun.UrunAdi} {urun.Kategori}";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"En çok tercih edilen yemek hesaplama hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Tüm kullanıcılar arasında en çok tercih edilen yemeği bulur ve ilgili etikette gösterir.
+        /// </summary>
+        /// <param name="lbl">Sonucu gösterecek Label kontrolü</param>
+        /// <exception cref="Exception">En çok tercih edilen yemek hesaplanırken oluşan hatalar için fırlatılır</exception>
+        public void EnCokTercihEdilenYemek(Label lbl)
+        {
+            try
+            {
+                var gudRepository = new GenericRepository<GunUrunDetay>();
+                var urunRepository = new GenericRepository<Urun>();
+
+                var allUrunIds = gudRepository.RepGetAll()
+                    .Select(gud => gud.UrunID);
+
+                if (!allUrunIds.Any())
+                {
+                    lbl.Text = "Henüz yemek tercihi yok";
+                    return;
+                }
+
+                var mostFrequentUrunId = allUrunIds
+                    .GroupBy(id => id)
+                    .OrderByDescending(g => g.Count())
+                    .First()
+                    .Key;
+
+                var urun = urunRepository.RepGetById(mostFrequentUrunId);
+                lbl.Text = $"{urun.UrunAdi} {urun.Kategori}";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"En çok tercih edilen yemek hesaplama hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Tüm kullanıcılar arasında en çok tercih edilen öğün zamanını bulur ve ilgili etikette gösterir.
+        /// </summary>
+        /// <param name="lbl">Sonucu gösterecek Label kontrolü</param>
+        /// <exception cref="Exception">En çok tercih edilen öğün hesaplanırken oluşan hatalar için fırlatılır</exception>
+        public void EnCokTercihEdilenOgunum(Label lbl)
+        {
+            try
+            {
+                var gudRepository = new GenericRepository<GunUrunDetay>();
+
+                var allMealTimes = gudRepository.RepGetAll()
+                    .Select(gud => gud.GununZamani);
+
+                if (!allMealTimes.Any())
+                {
+                    lbl.Text = "Henüz öğün tercihi yok";
+                    return;
+                }
+
+                var mostFrequentMealTime = allMealTimes
+                    .GroupBy(time => time)
+                    .OrderByDescending(g => g.Count())
+                    .First()
+                    .Key;
+
+                lbl.Text = mostFrequentMealTime;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"En çok tercih edilen öğün hesaplama hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Belirli bir kullanıcının en çok tercih ettiği öğün zamanını bulur ve ilgili etikette gösterir.
+        /// </summary>
+        /// <param name="kul">İşlem yapılacak kullanıcı</param>
+        /// <param name="lbl">Sonucu gösterecek Label kontrolü</param>
+        /// <exception cref="Exception">En çok tercih edilen öğün hesaplanırken oluşan hatalar için fırlatılır</exception>
+        public void EnCokTercihEdilenOgunum(Kullanici kul, Label lbl)
+        {
+            try
+            {
+                var gudRepository = new GenericRepository<GunUrunDetay>();
+
+                var userMealTimes = gudRepository.RepGetAll()
+                    .Where(gud => gud.UserID == kul.UserID)
+                    .Select(gud => gud.GununZamani);
+
+                if (!userMealTimes.Any())
+                {
+                    lbl.Text = "Henüz öğün tercihi yok";
+                    return;
+                }
+
+                var mostFrequentMealTime = userMealTimes
+                    .GroupBy(time => time)
+                    .OrderByDescending(g => g.Count())
+                    .First()
+                    .Key;
+
+                lbl.Text = mostFrequentMealTime;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"En çok tercih edilen öğün hesaplama hatası: {ex.Message}");
             }
         }
     }
-
-
 }

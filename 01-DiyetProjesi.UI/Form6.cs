@@ -12,54 +12,62 @@ using System.Windows.Forms;
 
 namespace _01_DiyetProjesi.UI
 {
-    public partial class Form6 : Form
+    public partial class Form6 : BaseForm
     {
+        private readonly GenericRepository<Kullanici> _kullaniciRepository;
+        private readonly GenericRepository<GunUrunDetay> _gunUrunDetayRepository;
+        private Kullanici _currentUser;
+
         public Form6()
         {
             InitializeComponent();
+            _kullaniciRepository = new GenericRepository<Kullanici>();
+            _gunUrunDetayRepository = new GenericRepository<GunUrunDetay>();
         }
 
         private void Form6_Load(object sender, EventArgs e)
         {
-            string usermail = string.Empty;
-            foreach (Control ctrl in this.Owner.Owner.Controls)
-            {
-                if (ctrl is GroupBox gb)
-                {
-                    foreach (Control ctr in gb.Controls)
-                    {
-                        if (ctr is TextBox tb && tb.Name == "tbEmail")
-                        {
-                            usermail = tb.Text;
-                        }
-                    }
-                }
-            }
-            GenericRepository<Kullanici> grKullanici = new GenericRepository<Kullanici>();
-            Kullanici kul = grKullanici.RepGetByConditionKullanici(usermail);
-            UIMetotlari uim = new UIMetotlari();
-            GenericRepository<GunUrunDetay> grGud = new GenericRepository<GunUrunDetay>();
-            List<GunUrunDetay> gunUrunDetays = grGud.RepGetAll();
-            if (gunUrunDetays.Count > 0)
-            {
-                uim.EnCokTercihEdilenYemek(kul, lblEncokYedigim);
-                uim.EnCokTercihEdilenYemek(lblEnCokYenen);
-                uim.EnCokTercihEdilenOgunum(lblEnCokTercihEdilenOgun);
-                uim.EnCokTercihEdilenOgunum(kul, lblEnCokTercihEttigimOgun);
-                uim.InitializeListViewRaporum(listView1);
-                uim.PopulateListViewRaporum(listView1, kul);
-            }
+            LoadUserData();
+            InitializeReports();
         }
 
-        private void btnGeri_Click(object sender, EventArgs e)
+        private void LoadUserData()
         {
-            this.Hide();
-            this.Owner.Show();
+            string userEmail = GetUserEmailFromParentForm();
+            _currentUser = _kullaniciRepository.RepGetByConditionKullanici(userEmail);
         }
 
-        private void Form6_FormClosed(object sender, FormClosedEventArgs e)
+        private string GetUserEmailFromParentForm()
         {
-            Application.Exit();
+            var emailControl = Owner?.Owner?.Controls
+                .OfType<GroupBox>()
+                .SelectMany(gb => gb.Controls.OfType<TextBox>())
+                .FirstOrDefault(tb => tb.Name == "tbEmail");
+
+            return emailControl?.Text ?? string.Empty;
+        }
+
+        private void InitializeReports()
+        {
+            var meals = _gunUrunDetayRepository.RepGetAll();
+            if (!meals.Any()) return;
+
+            UpdateStatistics();
+            InitializeAndPopulateReportList();
+        }
+
+        private void UpdateStatistics()
+        {
+            _uiMetotlari.EnCokTercihEdilenYemek(_currentUser, lblEncokYedigim);
+            _uiMetotlari.EnCokTercihEdilenYemek(lblEnCokYenen);
+            _uiMetotlari.EnCokTercihEdilenOgunum(lblEnCokTercihEdilenOgun);
+            _uiMetotlari.EnCokTercihEdilenOgunum(_currentUser, lblEnCokTercihEttigimOgun);
+        }
+
+        private void InitializeAndPopulateReportList()
+        {
+            _uiMetotlari.InitializeListViewRaporum(listView1);
+            _uiMetotlari.PopulateListViewRaporum(listView1, _currentUser);
         }
     }
 }
